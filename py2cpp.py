@@ -146,7 +146,9 @@ def op_to_str(op):
     match type(op):
         case ast.Add: return "+"
         case ast.Eq: return "=="
-        case _: print("unknown op", op)
+        case _:
+            print("unknown op", op)
+            return f"/* unknown op {type(op).__name__} */"
 
 def binop_to_str(binop):
     left = node_to_str(binop.left)
@@ -161,6 +163,18 @@ def handle_while(whileObj, indent=0):
     add_content(f"while ({node_to_str(whileObj.test)}) {'{'}", indent=indent)
     handle_body(whileObj.body, indent=indent+4)
     add_content("}", indent=indent)
+
+def handle_for(forObj, indent=0):
+    # check if it's for-range loop
+    if type(forObj.iter) == ast.Call:
+        if type(forObj.iter.func) == ast.Name:
+            if forObj.iter.func.id == "range":
+                add_content(f"for (int {node_to_str(forObj.target)} = 0; i < {node_to_str(forObj.iter.args[0])}; i++) {'{'}", indent=indent)
+                handle_body(forObj.body, indent=indent+4)
+                add_content("}", indent=indent)
+                return
+    add_content("don't know how to handle foreach loop yet", indent=indent)
+    print("don't know how to handle foreach loop yet")
 
 def handle_body(body, indent=0):
     for obj in body:
@@ -183,6 +197,8 @@ def handle_body(body, indent=0):
                 handle_raise(obj, indent=indent)
             case ast.While:
                 handle_while(obj, indent=indent)
+            case ast.For:
+                handle_for(obj, indent=indent)
             case _:
                 add_content(f"/* unknown obj {type(obj).__name__} */", indent=indent)
                 print("unknown", obj)
