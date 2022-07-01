@@ -115,6 +115,15 @@ def handle_return(ret, indent=0):
     cpp_ret = node_to_str(ret.value)
     add_content(f"return {cpp_ret};", indent=indent)
 
+def ifexp_to_str(ifexp):
+    return f"({node_to_str(ifexp.test)} ? {node_to_str(ifexp.body)} : {node_to_str(ifexp.orelse)})"
+
+def compare_to_str(compare):
+    left = node_to_str(compare.left)
+    right = node_to_str(compare.comparators[0])
+    op = op_to_str(compare.ops[0])
+    return f"{left} {op} {right}"
+
 def node_to_str(node):
     if type(node) == ast.Constant:
         return constant_to_str(node)
@@ -126,12 +135,17 @@ def node_to_str(node):
         return attribute_to_str(node)
     if type(node) == ast.BinOp:
         return binop_to_str(node)
+    if type(node) == ast.Compare:
+        return compare_to_str(node)
+    if type(node) == ast.IfExp:
+        return ifexp_to_str(node)
     print("unknown node", node)
     return f"/* unknown node {type(node).__name__} */"
 
 def op_to_str(op):
     match type(op):
         case ast.Add: return "+"
+        case ast.Eq: return "=="
         case _: print("unknown op", op)
 
 def binop_to_str(binop):
@@ -142,6 +156,11 @@ def binop_to_str(binop):
 
 def handle_raise(raiseObj, indent=0):
     add_content(f"throw {constant_to_str(raiseObj.exc.args[0])};", indent=indent)
+
+def handle_while(whileObj, indent=0):
+    add_content(f"while ({node_to_str(whileObj.test)}) {'{'}", indent=indent)
+    handle_body(whileObj.body, indent=indent+4)
+    add_content("}", indent=indent)
 
 def handle_body(body, indent=0):
     for obj in body:
@@ -162,6 +181,8 @@ def handle_body(body, indent=0):
                 handle_return(obj, indent=indent)
             case ast.Raise:
                 handle_raise(obj, indent=indent)
+            case ast.While:
+                handle_while(obj, indent=indent)
             case _:
                 add_content(f"/* unknown obj {type(obj).__name__} */", indent=indent)
                 print("unknown", obj)
