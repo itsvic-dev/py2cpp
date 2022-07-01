@@ -9,15 +9,6 @@ classes = []
 last_func = None
 defined_vars = {}
 
-file_in = sys.argv[1]
-file_out = file_in.replace(".py", ".cpp")
-
-with open(file_in) as file:
-    in_content = file.read()
-
-module = ast.parse(in_content)
-print(ast.dump(module, indent=4))
-
 def add_content(text, indent=4):
     content.append(" " * indent + text)
 
@@ -70,21 +61,18 @@ def handle_print(args):
 
 def attribute_to_str(attribute):
     is_ptr = False
-    value = attribute.value.id
+    value = node_to_str(attribute.value)
     if value == 'self':
         value = 'this'
         is_ptr = True
     return f"{value}{'->' if is_ptr else '.'}{attribute.attr}"
 
 def constant_to_str(constant):
+    if constant.value is None: return "nullptr"
     return json.dumps(constant.value)
 
 def call_to_str(call):
-    func = ""
-    if type(call.func) == ast.Attribute:
-        func = attribute_to_str(call.func)
-    if type(call.func) == ast.Name:
-        func = call.func.id
+    func = node_to_str(call.func)
     args = []
     for arg in call.args:
         args.append(node_to_str(arg))
@@ -100,7 +88,7 @@ def handle_assign(assign, indent=0):
                 defined_vars[last_func] = []
             if left_hand not in defined_vars[last_func]:
                 if type(assign.value) == ast.Call: # assume this is a constructor
-                    left_hand = f"{assign.value.func.id} {left_hand}"
+                    left_hand = f"{node_to_str(assign.value.func)} {left_hand}"
         value = node_to_str(assign.value)
         add_content(f"{left_hand} = {value};", indent=indent)
 
@@ -116,7 +104,8 @@ def handle_if(ifStmt, indent=0):
             add_content("return 0;", indent=indent+4)
             add_content("}", indent=indent)
             return
-    print("dont know how to parse ifs yet")
+    add_content("/* don't know how to handle ifs yet */", indent=indent)
+    print("don't know how to handle ifs yet")
 
 def handle_expr(expr, indent=0):
     if type(expr.value) == ast.Call:
@@ -137,7 +126,8 @@ def node_to_str(node):
         return attribute_to_str(node)
     if type(node) == ast.BinOp:
         return binop_to_str(node)
-    return "unknown node", node
+    print("unknown node", node)
+    return f"/* unknown node {type(node).__name__} */"
 
 def op_to_str(op):
     match type(op):
@@ -173,9 +163,20 @@ def handle_body(body, indent=0):
             case ast.Raise:
                 handle_raise(obj, indent=indent)
             case _:
+                add_content(f"/* unknown obj {type(obj).__name__} */", indent=indent)
                 print("unknown", obj)
 
-handle_body(module.body)
+if __name__ == "__main__":
+    file_in = sys.argv[1]
+    file_out = file_in.replace(".py", ".cpp")
 
-with open(file_out, "w+") as file:
-    file.write("\n".join([*includes, *content]))
+    with open(file_in) as file:
+        in_content = file.read()
+
+    module = ast.parse(in_content)
+    print(ast.dump(module, indent=4))
+
+    handle_body(module.body)
+
+    with open(file_out, "w+") as file:
+        file.write("\n".join([*includes, *content]))
